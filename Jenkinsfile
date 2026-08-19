@@ -27,7 +27,7 @@ pipeline {
 
                     echo
                     echo "POM:"
-                    ls -l pom.xml
+                    ls -l Java-Login-App/pom.xml
                 '''
             }
         }
