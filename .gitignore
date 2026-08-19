@@ -1,0 +1,35 @@
+# Maven
+**/target/
+.mvn/timing.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Jenkins
+jenkins-home/
+
+# Secrets
+*.key
+*.pem
+.env
+.env.*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
