@@ -43,7 +43,9 @@ pipeline {
         stage('Build & Test') {
             steps {
                 container('maven') {
-                    sh 'mvn -B -ntp clean verify'
+                    dir('Java-Login-App') {
+                        sh 'mvn -B -ntp clean verify'
+                   }
                 }
             }
         }
