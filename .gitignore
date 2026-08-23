@@ -21,6 +21,7 @@ Thumbs.db
 
 # Jenkins
 jenkins-home/
+*.logs
 
 # Secrets
 *.key
