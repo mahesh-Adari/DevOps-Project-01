@@ -7,51 +7,326 @@ pipeline {
         }
     }
 
+    environment {
+
+        // Application
+        APP_DIR = 'Java-Login-App'
+        APP_NAME = 'dptweb'
+
+        // Docker
+        DOCKER_IMAGE = 'your-dockerhub-username/dptweb'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+
+        // SonarQube
+        SONARQUBE_SERVER = 'sonarqube'
+
+        // Nexus
+        NEXUS_URL = 'http://172.18.0.1:8081'
+        NEXUS_REPOSITORY = 'maven-releases'
+
+        // GitOps
+        GITOPS_REPO = 'https://github.com/mahesh-Adari/DevOps-GitOps.git'
+        GITOPS_BRANCH = 'main'
+    }
+
     stages {
 
         stage('Checkout') {
             steps {
                 checkout scm
-            }
-        }
 
-        stage('Verify Workspace') {
-            steps {
                 sh '''
-                    echo "Workspace:"
-                    pwd
+                    echo "========================================"
+                    echo "Branch Information"
+                    echo "========================================"
+
+                    echo "Jenkins Branch: ${BRANCH_NAME}"
 
                     echo
-                    echo "Files:"
-                    find . -maxdepth 2 -type f | sort
+                    echo "Git Branch:"
+                    git branch --show-current
 
                     echo
-                    echo "Java application:"
-                    find Java-Login-App/src -type f | sort
+                    echo "Commit:"
+                    git rev-parse --short HEAD
 
                     echo
-                    echo "POM:"
-                    ls -l Java-Login-App/pom.xml
+                    echo "Commit Message:"
+                    git log -1 --pretty=%B
                 '''
-            }
-        }
-
-        stage('Maven Version') {
-            steps {
-                container('maven') {
-                    sh 'mvn --version'
-                }
             }
         }
 
         stage('Build & Test') {
             steps {
-                container('maven') {
-                    dir('Java-Login-App') {
-                        sh 'mvn -B -ntp clean verify'
+                dir("${APP_DIR}") {
+                    container('maven') {
+                        sh '''
+                            echo "========================================"
+                            echo "Maven Build & Test"
+                            echo "========================================"
+
+                            mvn -B -ntp clean verify
+                        '''
                     }
                 }
             }
+        }
+
+        /*
+         * Everything below this point is MAIN-ONLY.
+         *
+         * Feature branches and PR builds stop after
+         * Build & Test.
+         */
+
+        stage('SonarQube Analysis') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                dir("${APP_DIR}") {
+                    container('sonar') {
+                        withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                            sh '''
+                                echo "========================================"
+                                echo "SonarQube Analysis"
+                                echo "========================================"
+
+                                sonar-scanner \
+                                  -Dsonar.projectKey=java-login-app \
+                                  -Dsonar.projectName=Java-Login-App \
+                                  -Dsonar.sources=src/main/java \
+                                  -Dsonar.tests=src/test/java \
+                                  -Dsonar.java.binaries=target/classes
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
+        stage('Package Artifact') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                dir("${APP_DIR}") {
+                    container('maven') {
+                        sh '''
+                            echo "========================================"
+                            echo "Package Artifact"
+                            echo "========================================"
+
+                            ls -lh target/
+
+                            test -f target/*.war
+
+                            echo
+                            echo "WAR artifact:"
+                            ls -lh target/*.war
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                container('docker') {
+                    sh '''
+                        echo "========================================"
+                        echo "Docker Build"
+                        echo "========================================"
+
+                        docker version
+
+                        docker build \
+                          -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
+                          -t ${DOCKER_IMAGE}:latest \
+                          ${APP_DIR}
+
+                        echo
+                        echo "Images:"
+                        docker images | grep "${DOCKER_IMAGE}"
+                    '''
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                container('docker') {
+
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'dockerhub-credentials',
+                            usernameVariable: 'DOCKER_USERNAME',
+                            passwordVariable: 'DOCKER_PASSWORD'
+                        )
+                    ]) {
+
+                        sh '''
+                            echo "========================================"
+                            echo "Push Docker Image"
+                            echo "========================================"
+
+                            echo "${DOCKER_PASSWORD}" | \
+                                docker login \
+                                -u "${DOCKER_USERNAME}" \
+                                --password-stdin
+
+                            docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+                            docker push ${DOCKER_IMAGE}:latest
+
+                            docker logout
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Publish Artifact to Nexus') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                dir("${APP_DIR}") {
+                    container('maven') {
+
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'nexus-credentials',
+                                usernameVariable: 'NEXUS_USERNAME',
+                                passwordVariable: 'NEXUS_PASSWORD'
+                            )
+                        ]) {
+
+                            sh '''
+                                echo "========================================"
+                                echo "Publish Artifact to Nexus"
+                                echo "========================================"
+
+                                mvn -B -ntp deploy \
+                                  -DskipTests \
+                                  -DaltDeploymentRepository=nexus::default::${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/ \
+                                  -Dnexus.username=${NEXUS_USERNAME} \
+                                  -Dnexus.password=${NEXUS_PASSWORD}
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Update GitOps') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+
+                container('docker') {
+
+                    withCredentials([
+                        usernamePassword(
+                            credentialsId: 'github-gitops-credentials',
+                            usernameVariable: 'GIT_USERNAME',
+                            passwordVariable: 'GIT_PASSWORD'
+                        )
+                    ]) {
+
+                        sh '''
+                            echo "========================================"
+                            echo "Update GitOps Repository"
+                            echo "========================================"
+
+                            rm -rf gitops
+
+                            git clone \
+                              --branch ${GITOPS_BRANCH} \
+                              https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/mahesh-Adari/DevOps-GitOps.git \
+                              gitops
+
+                            cd gitops
+
+                            echo
+                            echo "GitOps repository:"
+                            pwd
+
+                            echo
+                            echo "Current files:"
+                            find . -maxdepth 3 -type f | sort
+
+                            echo
+                            echo "Updating image tag..."
+
+                            # Example:
+                            # sed -i "s/tag:.*/tag: ${IMAGE_TAG}/" \
+                            #     environments/dev/deployment.yaml
+
+                            git config user.name "jenkins"
+                            git config user.email "jenkins@local"
+
+                            git add .
+
+                            if git diff --cached --quiet; then
+                                echo "No GitOps changes detected."
+                            else
+                                git commit -m "Update dptweb image to ${IMAGE_TAG}"
+                                git push origin ${GITOPS_BRANCH}
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo "========================================"
+            echo "Pipeline completed successfully"
+            echo "Branch: ${BRANCH_NAME}"
+            echo "Build: ${BUILD_NUMBER}"
+            echo "========================================"
+        }
+
+        failure {
+            echo "========================================"
+            echo "Pipeline FAILED"
+            echo "Branch: ${BRANCH_NAME}"
+            echo "Build: ${BUILD_NUMBER}"
+            echo "========================================"
+        }
+
+        always {
+            echo "Cleaning workspace..."
+            deleteDir()
         }
     }
 }
