@@ -170,7 +170,7 @@ pipeline {
                             ${APP_DIR}
                     '''
                 }
-            }
+        }
         }
 
         stage('Push Docker Image') {
