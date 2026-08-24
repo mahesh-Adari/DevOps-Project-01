@@ -42,9 +42,6 @@ pipeline {
 
                     echo "Jenkins Branch: ${BRANCH_NAME}"
 
-                    echo
-                    echo "Git Branch:"
-                    git branch --show-current
 
                     echo
                     echo "Commit:"
