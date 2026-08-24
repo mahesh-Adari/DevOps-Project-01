@@ -320,10 +320,5 @@ pipeline {
             echo "Build: ${BUILD_NUMBER}"
             echo "========================================"
         }
-
-        always {
-            echo "Cleaning workspace..."
-            deleteDir()
-        }
     }
 }
