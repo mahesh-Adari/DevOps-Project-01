@@ -70,12 +70,6 @@ pipeline {
             }
         }
 
-        /*
-         * Everything below this point is MAIN-ONLY.
-         *
-         * Feature branches and PR builds stop after
-         * Build & Test.
-         */
 
         stage('SonarQube Analysis') {
 
