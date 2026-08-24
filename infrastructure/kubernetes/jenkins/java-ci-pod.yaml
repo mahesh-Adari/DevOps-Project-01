@@ -50,7 +50,6 @@ spec:
         - dockerd
       args:
         - --host=unix:///var/run/docker.sock 
-        - --host=tcp://0.0.0.0:2375
       resources:
         requests:
           cpu: "500m"
