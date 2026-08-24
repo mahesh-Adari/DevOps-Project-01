@@ -18,37 +18,37 @@ pipeline {
         stage('Verify Workspace') {
             steps {
                 sh '''
+                    echo "Workspace:"
                     pwd
-                    find . -maxdepth 3 -type f | sort
+
+                    echo
+                    echo "Files:"
+                    find . -maxdepth 2 -type f | sort
+
+                    echo
+                    echo "Java application:"
+                    find Java-Login-App/src -type f | sort
+
+                    echo
+                    echo "POM:"
+                    ls -l Java-Login-App/pom.xml
                 '''
             }
         }
 
         stage('Maven Version') {
             steps {
-                dir('Java-Login-App') {
-                    container('maven') {
-                        sh 'mvn --version'
-                    }
+                container('maven') {
+                    sh 'mvn --version'
                 }
             }
         }
 
         stage('Build & Test') {
             steps {
-                dir('Java-Login-App') {
-                    container('maven') {
+                container('maven') {
+                    dir('Java-Login-App') {
                         sh 'mvn -B -ntp clean verify'
-                    }
-                }
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                dir('Java-Login-App') {
-                    container('sonar') {
-                        // SonarQube analysis
                     }
                 }
             }
