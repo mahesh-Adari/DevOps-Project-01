@@ -44,12 +44,12 @@ pipeline {
 
 
                     echo
-                    echo "Commit:"
-                    git rev-parse --short HEAD
+                    echo "Workspace:"
+                    pwd
 
                     echo
-                    echo "Commit Message:"
-                    git log -1 --pretty=%B
+                    echo "Files:"
+                    find . -maxdepth 2 -type f | sort
                 '''
             }
         }
