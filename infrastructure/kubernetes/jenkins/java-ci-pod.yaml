@@ -41,15 +41,20 @@ spec:
           memory: "1Gi"
 
     - name: docker
-      image: docker:29-cli
+      image: docker:29-dind
+      securityContext: 
+        privileged: true
+        runAsUser: 0
+        runAsGroup: 0
       command:
-        - sleep
+        - dockerd
       args:
-        - 99d
+        - --host=unix:///var/run/docker.sock 
+        - --host=tcp://0.0.0.2375
       resources:
         requests:
-          cpu: "100m"
-          memory: "256Mi"
-        limits:
-          cpu: "500m"
+          cpu: ""500m"
           memory: "512Mi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"

@@ -145,19 +145,29 @@ pipeline {
                 container('docker') {
                     sh '''
                         echo "========================================"
+                        echo "Waiting for Docker daemon"
+                        echo "========================================"
+
+                        for i in $(seq 1 30); do
+                            if docker info >/dev/null 2>&1; then
+                                echo "Docker daemon is ready"
+                                break
+                            fi
+
+                            echo "Waiting for Docker daemon..."
+                            sleep 2
+                        done
+
+                        docker info
+
+                        echo "========================================"
                         echo "Docker Build"
                         echo "========================================"
 
-                        docker version
-
                         docker build \
-                          -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
-                          -t ${DOCKER_IMAGE}:latest \
-                          ${APP_DIR}
-
-                        echo
-                        echo "Images:"
-                        docker images | grep "${DOCKER_IMAGE}"
+                            -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
+                            -t ${DOCKER_IMAGE}:latest \
+                            ${APP_DIR}
                     '''
                 }
             }
