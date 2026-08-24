@@ -78,9 +78,6 @@ pipeline {
          */
 
         stage('SonarQube Analysis') {
-            when {
-                branch 'main'
-            }
 
             steps {
                 dir("${APP_DIR}") {
@@ -105,9 +102,6 @@ pipeline {
         }
 
         stage('Quality Gate') {
-            when {
-                branch 'main'
-            }
 
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
