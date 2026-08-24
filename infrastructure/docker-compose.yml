@@ -13,6 +13,7 @@ services:
       - devops-jenkins-home:/var/jenkins_home
     networks:
       - devops
+      - kind
 
   sonarqube:
     image: sonarqube:lts-community
@@ -52,3 +53,5 @@ networks:
   devops:
     name: devops
     driver: bridge
+  kind:
+   external: true
