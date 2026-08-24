@@ -18,7 +18,7 @@ pipeline {
         IMAGE_TAG = "${BUILD_NUMBER}"
 
         // SonarQube
-        SONARQUBE_SERVER = 'sonarqube'
+        SONARQUBE_SERVER = 'SonarQube'
 
         // Nexus
         NEXUS_URL = 'http://172.18.0.1:8081'
