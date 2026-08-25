@@ -334,6 +334,8 @@ pipeline {
                     ]) {
 
                         sh '''
+                            set -e
+                            
                             echo "========================================"
                             echo "Update GitOps Repository"
                             echo "========================================"
@@ -347,25 +349,29 @@ pipeline {
 
                             cd gitops
 
-                            echo
+                            
                             echo "GitOps repository:"
                             pwd
 
                             echo
-                            echo "Current files:"
-                            find . -maxdepth 3 -type f | sort
+                            echo "Current deployment:"
+                            grep "image:" environments/dev/deployment.yaml
 
                             echo
-                            echo "Updating image tag..."
-
-                            # Example:
-                            # sed -i "s/tag:.*/tag: ${IMAGE_TAG}/" \
-                            #     environments/dev/deployment.yaml
+                            echo "Updating image tag to ${IMAGE_TAG}..."
+                    
+                            
+                            sed -i \
+                                "s|image: ${DOCKER_IMAGE}:.*|image: ${DOCKER_IMAGE}:${IMAGE_TAG}|" \
+                                environments/dev/deployment.yaml
+                            echo
+                            echo "Updated deployment:"
+                            grep "image:" environments/dev/deployment.yaml
 
                             git config user.name "jenkins"
                             git config user.email "jenkins@local"
 
-                            git add .
+                            git add environments/dev/deployment.yaml
 
                             if git diff --cached --quiet; then
                                 echo "No GitOps changes detected."
