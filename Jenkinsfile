@@ -59,11 +59,26 @@ pipeline {
                 dir("${APP_DIR}") {
                     container('maven') {
                         sh '''
+                            echo "===== CPU ====="
+                            nproc
+                            cat /sys/fs/cgroup/cpu.max 2>/dev/null || true
+
+                            echo "===== MEMORY ====="
+                            cat /sys/fs/cgroup/memory.max 2>/dev/null || true
+
+                            echo "===== CONTAINERS ====="
+                            ps aux
                             echo "========================================"
                             echo "Maven Build & Test"
                             echo "========================================"
 
+                            START=$(date +%s)
+
                             mvn -B -ntp clean verify
+
+                            END=$(date +%s)
+
+                            echo "Build Time: $((END-START)) seconds"
                         '''
                     }
                 }
@@ -139,9 +154,12 @@ pipeline {
             steps {
                 container('docker') {
                     sh '''
+                        
                         echo "========================================"
                         echo "Waiting for Docker daemon"
                         echo "========================================"
+
+                        START=$(date +%s)
 
                         export DOCKER_HOST=unix:///var/run/docker-shared/docker.sock
 
@@ -155,17 +173,29 @@ pipeline {
                             sleep 2
                         done
 
+                        END=$(date +%s)
+                        echo "Docker daemon is ready after $(( END - START )) seconds"
+
+                        echo "========================================"
+                        echo "Docker Info"
+                        echo "========================================"
                         
+                        START=$(date +%s)
                         docker info
+                        END=$(date +%s)
+                        echo "Docker info took $((END - START)) seconds"
 
                         echo "========================================"
                         echo "Docker Build"
                         echo "========================================"
 
+                        START=$(date +%s)
                         docker build \
                             -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
                             -t ${DOCKER_IMAGE}:latest \
                             ${APP_DIR}
+                        END=$(date +%s)
+                        echo "Docker build took $((END - START)) seconds"
 
                         echo "========================================"
                         echo "Built Image"
