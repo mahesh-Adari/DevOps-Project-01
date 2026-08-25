@@ -265,6 +265,8 @@ pipeline {
 
                                     mvn -B -ntp deploy \
                                         -DskipTests \
+                                        -Drevision=1.0.${BUILD_NUMBER} \
+                                        -DgenerateBackupPoms=false
                                         -s "${MAVEN_SETTINGS}"
                                 '''
                             }
@@ -299,7 +301,7 @@ pipeline {
                             echo "========================================"
 
                             docker info
-                            
+
                             echo "========================================"
                             echo "Push Docker Image"
                             echo "========================================"
