@@ -1,6 +1,10 @@
 apiVersion: v1
 kind: Pod
 
+env:
+  - name: DOCKER_HOST
+    value: unix:///var/run/docker-shared/docker.sock
+
 spec:
 
   automountServiceAccountToken: false
