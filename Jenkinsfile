@@ -72,7 +72,13 @@ pipeline {
                             echo "Maven Build & Test"
                             echo "========================================"
 
-                            time mvn -B -ntp clean verify
+                            START=$(date +%s)
+
+                            mvn -B -ntp clean verify
+
+                            END=$(date +%s)
+
+                            echo "Build Time: $((END-START)) seconds"
                         '''
                     }
                 }
@@ -153,6 +159,8 @@ pipeline {
                         echo "Waiting for Docker daemon"
                         echo "========================================"
 
+                        START=$(date +%s)
+
                         export DOCKER_HOST=unix:///var/run/docker-shared/docker.sock
 
                         for i in $(seq 1 30); do
@@ -165,20 +173,29 @@ pipeline {
                             sleep 2
                         done
 
+                        END=$(date +%s)
+                        echo "Docker daemon is ready after $(( END - START )) seconds"
+
                         echo "========================================"
                         echo "Docker Info"
                         echo "========================================"
                         
-                        time docker info
+                        START=$(date +%s)
+                        docker info
+                        END=$(date +%s)
+                        echo "Docker info took $((END - START)) seconds"
 
                         echo "========================================"
                         echo "Docker Build"
                         echo "========================================"
 
-                        time docker build \
+                        START=$(date +%s)
+                        docker build \
                             -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
                             -t ${DOCKER_IMAGE}:latest \
                             ${APP_DIR}
+                        END=$(date +%s)
+                        echo "Docker build took $((END - START)) seconds"
 
                         echo "========================================"
                         echo "Built Image"
