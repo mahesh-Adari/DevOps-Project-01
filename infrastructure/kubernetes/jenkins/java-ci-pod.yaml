@@ -67,6 +67,9 @@ spec:
         - sleep
       args:
         - 99d
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
       volumeMounts:
         - name: docker-socket
           mountPath: /var/run/docker-shared

@@ -224,6 +224,7 @@ pipeline {
                     mkdir -p /home/jenkins/agent/trivy-cache
 
                     trivy image \
+                        --docker-host "${DOCKER_HOST}" \
                         --cache-dir /home/jenkins/agent/trivy \
                         --severity HIGH,CRITICAL \
                         --exit-code 1 \
