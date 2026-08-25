@@ -225,7 +225,7 @@ pipeline {
 
                     trivy image \
                         --docker-host "${DOCKER_HOST}" \
-                        --cache-dir /home/jenkins/agent/trivy \
+                        --cache-dir /home/jenkins/agent/trivy-cache \
                         --severity HIGH,CRITICAL \
                         --exit-code 1 \
                         ${DOCKER_IMAGE}:${IMAGE_TAG}
