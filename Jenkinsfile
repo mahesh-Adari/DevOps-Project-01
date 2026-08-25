@@ -221,7 +221,10 @@ pipeline {
 
                     export DOCKER_HOST=unix:///var/run/docker-shared/docker.sock
 
+                    mkdir -p /home/jenkins/agent/trivy-cache
+
                     trivy image \
+                        --cache-dir /home/jenkins/agent/trivy
                         --severity HIGH,CRITICAL \
                         --exit-code 1 \
                         ${DOCKER_IMAGE}:${IMAGE_TAG}
