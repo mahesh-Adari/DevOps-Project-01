@@ -234,6 +234,31 @@ pipeline {
             }
         }
 
+        stage('Set Maven Version') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                container('maven') {
+                    sh '''
+                        echo "========================================"
+                        echo "Set Maven Version"
+                        echo "========================================"
+
+                        mvn -B -ntp versions:set \
+                            -DnewVersion=1.0.${BUILD_NUMBER} \
+                            -DgenerateBackupPoms=false
+
+                        mvn -B -ntp help:evaluate \
+                            -Dexpression=project.version \
+                            -q \
+                            -DforceStdout
+                    '''
+                }
+            }
+        }
+
         stage('Publish Artifact to Nexus') {
             when {
                 branch 'main'
@@ -265,8 +290,6 @@ pipeline {
 
                                     mvn -B -ntp deploy \
                                         -DskipTests \
-                                        -Drevision=1.0.${BUILD_NUMBER} \
-                                        -DgenerateBackupPoms=false
                                         -s "${MAVEN_SETTINGS}"
                                 '''
                             }
