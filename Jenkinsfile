@@ -224,7 +224,7 @@ pipeline {
                     mkdir -p /home/jenkins/agent/trivy-cache
 
                     trivy image \
-                        --cache-dir /home/jenkins/agent/trivy
+                        --cache-dir /home/jenkins/agent/trivy \
                         --severity HIGH,CRITICAL \
                         --exit-code 1 \
                         ${DOCKER_IMAGE}:${IMAGE_TAG}
