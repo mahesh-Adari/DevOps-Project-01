@@ -54,20 +54,38 @@ pipeline {
             }
         }
 
+        stage('Set Maven Version') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                dir("${APP_DIR}"){
+                    container('maven') {
+                        sh '''
+                            echo "========================================"
+                            echo "Set Maven Version"
+                            echo "========================================"
+
+                            mvn -B -ntp versions:set \
+                                -DnewVersion=1.0.${BUILD_NUMBER} \
+                                -DgenerateBackupPoms=false
+
+                            mvn -B -ntp help:evaluate \
+                                -Dexpression=project.version \
+                                -q \
+                                -DforceStdout
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Build & Test') {
             steps {
                 dir("${APP_DIR}") {
                     container('maven') {
                         sh '''
-                            echo "===== CPU ====="
-                            nproc
-                            cat /sys/fs/cgroup/cpu.max 2>/dev/null || true
-
-                            echo "===== MEMORY ====="
-                            cat /sys/fs/cgroup/memory.max 2>/dev/null || true
-
-                            echo "===== CONTAINERS ====="
-                            ps aux
                             echo "========================================"
                             echo "Maven Build & Test"
                             echo "========================================"
@@ -79,6 +97,10 @@ pipeline {
                             END=$(date +%s)
 
                             echo "Build Time: $((END-START)) seconds"
+
+                            echo
+                            echo "Generated artifacts:"
+                            ls -lh target/
                         '''
                     }
                 }
@@ -115,32 +137,6 @@ pipeline {
             steps {
                 timeout(time: 10, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        stage('Package Artifact') {
-            when {
-                branch 'main'
-            }
-
-            steps {
-                dir("${APP_DIR}") {
-                    container('maven') {
-                        sh '''
-                            echo "========================================"
-                            echo "Package Artifact"
-                            echo "========================================"
-
-                            ls -lh target/
-
-                            test -f target/*.war
-
-                            echo
-                            echo "WAR artifact:"
-                            ls -lh target/*.war
-                        '''
-                    }
                 }
             }
         }
@@ -234,30 +230,6 @@ pipeline {
             }
         }
 
-        stage('Set Maven Version') {
-            when {
-                branch 'main'
-            }
-
-            steps {
-                container('maven') {
-                    sh '''
-                        echo "========================================"
-                        echo "Set Maven Version"
-                        echo "========================================"
-
-                        mvn -B -ntp versions:set \
-                            -DnewVersion=1.0.${BUILD_NUMBER} \
-                            -DgenerateBackupPoms=false
-
-                        mvn -B -ntp help:evaluate \
-                            -Dexpression=project.version \
-                            -q \
-                            -DforceStdout
-                    '''
-                }
-            }
-        }
 
         stage('Publish Artifact to Nexus') {
             when {
