@@ -59,11 +59,20 @@ pipeline {
                 dir("${APP_DIR}") {
                     container('maven') {
                         sh '''
+                            echo "===== CPU ====="
+                            nproc
+                            cat /sys/fs/cgroup/cpu.max 2>/dev/null || true
+
+                            echo "===== MEMORY ====="
+                            cat /sys/fs/cgroup/memory.max 2>/dev/null || true
+
+                            echo "===== CONTAINERS ====="
+                            ps aux
                             echo "========================================"
                             echo "Maven Build & Test"
                             echo "========================================"
 
-                            mvn -B -ntp clean verify
+                            time mvn -B -ntp clean verify
                         '''
                     }
                 }
@@ -139,6 +148,7 @@ pipeline {
             steps {
                 container('docker') {
                     sh '''
+                        
                         echo "========================================"
                         echo "Waiting for Docker daemon"
                         echo "========================================"
@@ -155,14 +165,17 @@ pipeline {
                             sleep 2
                         done
 
+                        echo "========================================"
+                        echo "Docker Info"
+                        echo "========================================"
                         
-                        docker info
+                        time docker info
 
                         echo "========================================"
                         echo "Docker Build"
                         echo "========================================"
 
-                        docker build \
+                        time docker build \
                             -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
                             -t ${DOCKER_IMAGE}:latest \
                             ${APP_DIR}
