@@ -69,10 +69,16 @@
 	</build>
 <distributionManagement>
     <repository>
-        <id>central</id>
-        <name>a0nymgefaiwwu-artifactory-primary-0-releases</name>
-        <url>https://edshopdpt8.jfrog.io/artifactory/libs-release-local</url>
+        <id>nexus-releases</id>
+        <name>Nexus Releases</name>
+        <url>http://172.18.0.1:8081/repository/maven-releases/</url>
     </repository>
-</distributionManagement> 
+
+    <snapshotRepository>
+        <id>nexus-snapshots</id>
+        <name>Nexus Snapshots</name>
+        <url>http://172.18.0.1:8081/repository/maven-snapshots/</url>
+    </snapshotRepository>
+</distributionManagement>
 
 </project>

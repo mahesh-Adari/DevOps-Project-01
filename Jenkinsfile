@@ -14,7 +14,7 @@ pipeline {
         APP_NAME = 'dptweb'
 
         // Docker
-        DOCKER_IMAGE = 'your-dockerhub-username/dptweb'
+        DOCKER_IMAGE = 'mahesh6436/dptweb'
         IMAGE_TAG = "${BUILD_NUMBER}"
 
         // SonarQube
@@ -130,6 +130,7 @@ pipeline {
             }
         }
 
+
         stage('Build Docker Image') {
             when {
                 branch 'main'
@@ -142,6 +143,8 @@ pipeline {
                         echo "Waiting for Docker daemon"
                         echo "========================================"
 
+                        export DOCKER_HOST=unix:///var/run/docker-shared/docker.sock
+
                         for i in $(seq 1 30); do
                             if docker info >/dev/null 2>&1; then
                                 echo "Docker daemon is ready"
@@ -152,6 +155,7 @@ pipeline {
                             sleep 2
                         done
 
+                        
                         docker info
 
                         echo "========================================"
@@ -162,9 +166,78 @@ pipeline {
                             -t ${DOCKER_IMAGE}:${IMAGE_TAG} \
                             -t ${DOCKER_IMAGE}:latest \
                             ${APP_DIR}
+
+                        echo "========================================"
+                        echo "Built Image"
+                        echo "========================================"
+                        
+                        docker images ${DOCKER_IMAGE}
                     '''
                 }
+            }
         }
+
+        stage('Trivy Scan') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                container('trivy') {
+                sh '''
+                    echo "========================================"
+                    echo "Trivy Image Scan"
+                    echo "========================================"
+
+                    export DOCKER_HOST=unix:///var/run/docker-shared/docker.sock
+
+                    trivy image \
+                        --severity HIGH,CRITICAL \
+                        --exit-code 1 \
+                        ${DOCKER_IMAGE}:${IMAGE_TAG}
+                    '''
+                }
+            }
+        }
+
+        stage('Publish Artifact to Nexus') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                dir("${APP_DIR}") {
+                    container('maven') {
+
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'nexus-credentials',
+                                usernameVariable: 'NEXUS_USERNAME',
+                                passwordVariable: 'NEXUS_PASSWORD'
+                            )
+                        ]) {
+
+                            configFileProvider([
+                                configFile(
+                                    fileId: 'maven-nexus-settings',
+                                    variable: 'MAVEN_SETTINGS'
+                                )
+                            ]){
+
+                                sh '''
+                                    echo "========================================"
+                                    echo "Publish Artifact to Nexus"
+                                    echo "========================================"
+
+                                    mvn -B -ntp deploy \
+                                        -DskipTests \
+                                        -s "${MAVEN_SETTINGS}"
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         stage('Push Docker Image') {
@@ -194,7 +267,6 @@ pipeline {
                                 --password-stdin
 
                             docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
-                            docker push ${DOCKER_IMAGE}:latest
 
                             docker logout
                         '''
@@ -203,40 +275,7 @@ pipeline {
             }
         }
 
-        stage('Publish Artifact to Nexus') {
-            when {
-                branch 'main'
-            }
-
-            steps {
-                dir("${APP_DIR}") {
-                    container('maven') {
-
-                        withCredentials([
-                            usernamePassword(
-                                credentialsId: 'nexus-credentials',
-                                usernameVariable: 'NEXUS_USERNAME',
-                                passwordVariable: 'NEXUS_PASSWORD'
-                            )
-                        ]) {
-
-                            sh '''
-                                echo "========================================"
-                                echo "Publish Artifact to Nexus"
-                                echo "========================================"
-
-                                mvn -B -ntp deploy \
-                                  -DskipTests \
-                                  -DaltDeploymentRepository=nexus::default::${NEXUS_URL}/repository/${NEXUS_REPOSITORY}/ \
-                                  -Dnexus.username=${NEXUS_USERNAME} \
-                                  -Dnexus.password=${NEXUS_PASSWORD}
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-
+        
         stage('Update GitOps') {
             when {
                 branch 'main'
