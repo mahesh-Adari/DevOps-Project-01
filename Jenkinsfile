@@ -291,6 +291,15 @@ pipeline {
                     ]) {
 
                         sh '''
+
+                            export DOCKER_HOST=unix:///var/run/docker-shared/docker.sock
+
+                            echo "========================================"
+                            echo "Checking Docker Daemon"
+                            echo "========================================"
+
+                            docker info
+                            
                             echo "========================================"
                             echo "Push Docker Image"
                             echo "========================================"
