@@ -327,7 +327,7 @@ pipeline {
 
                     withCredentials([
                         usernamePassword(
-                            credentialsId: 'github-gitops-credentials',
+                            credentialsId: 'github-devops-project-01',
                             usernameVariable: 'GIT_USERNAME',
                             passwordVariable: 'GIT_PASSWORD'
                         )
