@@ -404,8 +404,7 @@ pipeline {
             echo "========================================"
         }
         always {
-            echo "Cleaning workspace..."
-            deleteDir()
+            echo "Pipeline execution completed."
         }
     }
 }
