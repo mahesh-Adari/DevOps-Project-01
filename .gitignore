@@ -34,5 +34,6 @@ jenkins-home/
 *.tfstate
 *.tfstate.*
 crash.log
+crash.*.log
 
 infrastructure/kubernetes/jenkins/certs/
