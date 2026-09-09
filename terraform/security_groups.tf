@@ -26,15 +26,6 @@ resource "aws_vpc_security_group_ingress_rule" "jenkins_ui" {
   ip_protocol = "tcp"
 }
 
-resource "aws_vpc_security_group_ingress_rule" "jenkins_eks_agents" {
-  security_group_id = aws_security_group.jenkins.id
-
-  referenced_security_group_id = "sg-06db01b5438fdb673"
-  from_port                    = 8080
-  to_port                      = 8080
-  ip_protocol                  = "tcp"
-}
-
 resource "aws_vpc_security_group_egress_rule" "jenkins_all" {
   security_group_id = aws_security_group.jenkins.id
 

@@ -71,11 +71,6 @@ resource "aws_iam_role_policy_attachment" "ec2_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-resource "aws_iam_role_policy_attachment" "ec2_ecr" {
-  role       = aws_iam_role.ec2.name
-  policy_arn = aws_iam_policy.ecr_push.arn
-}
-
 resource "aws_iam_instance_profile" "ec2" {
   name = "devops-ec2-role"
   role = aws_iam_role.ec2.name
@@ -96,6 +91,11 @@ resource "aws_iam_role" "eks_cluster" {
       }
     ]
   })
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cluster" {
+  role       = aws_iam_role.eks_cluster.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
 resource "aws_iam_role" "eks_node" {
@@ -129,4 +129,61 @@ resource "aws_iam_role_policy_attachment" "eks_node_worker" {
 resource "aws_iam_role_policy_attachment" "eks_node_ecr" {
   role       = aws_iam_role.eks_node.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPullOnly"
+}
+
+resource "aws_iam_role" "jenkins_agent" {
+  name        = "devops-jenkins-agent-role"
+  description = "IAM role for Jenkins agent pods running in EKS"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "pods.eks.amazonaws.com"
+        }
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
+      }
+    ]
+  })
+
+  tags = {
+    Project     = "DevOps-Lab"
+    Environment = "Production-Lab"
+  }
+}
+
+resource "aws_iam_role_policy" "jenkins_agent_ecr" {
+  name = "JenkinsAgentECRPushPolicy"
+  role = aws_iam_role.jenkins_agent.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRLogin"
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRPush"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:CompleteLayerUpload",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart"
+        ]
+        Resource = "arn:aws:ecr:us-east-1:611669941011:repository/dptweb"
+      }
+    ]
+  })
 }

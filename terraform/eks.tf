@@ -38,7 +38,7 @@ resource "aws_eks_cluster" "devops" {
 resource "aws_eks_node_group" "devops" {
   cluster_name    = aws_eks_cluster.devops.name
   node_group_name = "devops-ng"
-  node_role_arn   = "arn:aws:iam::611669941011:role/devops-eks-node-role"
+  node_role_arn   = aws_iam_role.eks_node.arn
 
   subnet_ids = [
     aws_subnet.private_a.id,
@@ -61,10 +61,94 @@ resource "aws_eks_node_group" "devops" {
     max_unavailable = 1
   }
 
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_node_cni,
+    aws_iam_role_policy_attachment.eks_node_worker,
+    aws_iam_role_policy_attachment.eks_node_ecr,
+
+    aws_route_table_association.private_a,
+    aws_route_table_association.private_b,
+
+    aws_eks_addon.vpc_cni,
+    aws_eks_addon.kube_proxy,
+  ]
+
   tags = {
     Project     = "DevOps-Lab"
     Environment = "Production-Lab"
   }
+}
+
+resource "aws_eks_addon" "pod_identity_agent" {
+  cluster_name                = aws_eks_cluster.devops.name
+  addon_name                  = "eks-pod-identity-agent"
+  addon_version               = "v1.3.10-eksbuild.3"
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  tags = {
+    Project     = "DevOps-Lab"
+    Environment = "Production-Lab"
+  }
+}
+
+resource "aws_eks_addon" "vpc_cni" {
+
+  cluster_name = aws_eks_cluster.devops.name
+
+  addon_name = "vpc-cni"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  tags = {
+    Project     = "DevOps-Lab"
+    Environment = "Production-Lab"
+  }
+
+}
+
+resource "aws_eks_addon" "kube_proxy" {
+
+  cluster_name = aws_eks_cluster.devops.name
+
+  addon_name = "kube-proxy"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  tags = {
+    Project     = "DevOps-Lab"
+    Environment = "Production-Lab"
+  }
+
+}
+
+resource "aws_eks_addon" "coredns" {
+
+  cluster_name = aws_eks_cluster.devops.name
+
+  addon_name = "coredns"
+
+  resolve_conflicts_on_create = "OVERWRITE"
+  resolve_conflicts_on_update = "OVERWRITE"
+
+  tags = {
+    Project     = "DevOps-Lab"
+    Environment = "Production-Lab"
+  }
+
+}
+
+resource "aws_eks_pod_identity_association" "jenkins_agent" {
+  cluster_name    = aws_eks_cluster.devops.name
+  namespace       = "jenkins-agents"
+  service_account = "jenkins-agent"
+  role_arn        = aws_iam_role.jenkins_agent.arn
+
+  depends_on = [
+    aws_eks_addon.pod_identity_agent
+  ]
 }
 
 resource "aws_eks_access_entry" "jenkins" {
