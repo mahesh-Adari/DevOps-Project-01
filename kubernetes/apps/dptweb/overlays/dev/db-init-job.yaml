@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: java-login-app-db-init
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        workload: application
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: application
+          effect: NoSchedule
+      containers:
+        - name: mysql-client
+          image: mysql:8.4
+          envFrom:
+            - secretRef:
+                name: java-login-app-db
+          env:
+            - name: DB_HOST
+              value: REPLACE_WITH_RDS_ENDPOINT
+          command: ["sh", "-c"]
+          args:
+            - |
+              MYSQL_PWD="$SPRING_DATASOURCE_PASSWORD" mysql \
+                -h "$DB_HOST" -u "$SPRING_DATASOURCE_USERNAME" UserDB -e "
+                CREATE TABLE IF NOT EXISTS Employee (
+                  first_name VARCHAR(50),
+                  last_name  VARCHAR(50),
+                  email      VARCHAR(100),
+                  username   VARCHAR(50),
+                  password   VARCHAR(100),
+                  regdate    DATE
+                );"

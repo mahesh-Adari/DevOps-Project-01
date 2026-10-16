@@ -3,4 +3,4 @@ kind: Kustomization
 namespace: application
 resources:
   - ../../base
-  - ../../../../ingress/application-ingress.yaml
+  - ingress.yaml
