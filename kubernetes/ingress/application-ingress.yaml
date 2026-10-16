@@ -1,0 +1,31 @@
+# ALB ingress for the application front-end Service.
+# Confirm the Service name, namespace, and port match the application's Service manifest.
+# This initial manifest provisions HTTP/80 only because no application ACM certificate/domain
+# has been supplied yet. Add HTTPS/443 + certificate-arn after the ACM certificate is ready.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: application-public
+  namespace: application
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: 0.0.0.0/0
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/success-codes: "200-399"
+    alb.ingress.kubernetes.io/tags: Project=DevOps-Lab,Environment=Production-Lab
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: java-login-app
+                port:
+                  number: 8080

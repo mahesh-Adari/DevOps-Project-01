@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-login-app
+  namespace: application
+  labels:
+    app: java-login-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: java-login-app
+  template:
+    metadata:
+      labels:
+        app: java-login-app
+    spec:
+      nodeSelector:
+        workload: application
+
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: application
+          effect: NoSchedule
+      containers:
+        - name: java-login-app
+          image: REPLACE_WITH_ECR_URI:REPLACE_WITH_IMAGE_TAG
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-login-app
+  namespace: application
+  labels:
+    app: java-login-app
+spec:
+  type: ClusterIP
+  selector:
+    app: java-login-app
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
