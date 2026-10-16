@@ -1,0 +1,26 @@
+# Public ALB ingress. Configure HTTPS and an ACM certificate before production use.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: application-public
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: 0.0.0.0/0
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/success-codes: "200-399"
+    alb.ingress.kubernetes.io/tags: Project=DevOps-Lab,Environment=Production-Lab
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: java-login-app
+                port:
+                  number: 8080
