@@ -1,0 +1,140 @@
+I reviewed the combined terraform-infra.txt containing the three Terraform directories: terraform-bootstrap, terraform-persistent, and terraform. The review covers the configuration as a whole, including cross-stack references and the unresolved items from our earlier messages.
+Overall assessment: the architecture is a good foundation, but it is not ready for provisioning yet. There are concrete configuration gaps, placeholder inputs, and deployment dependencies that need to be resolved first.
+1. Critical blockers
+These are the items I would address first.
+Blocker 1 — Placeholder values in terraform.tfvars
+The Client VPN certificate ARNs contain YOUR-SERVER-CERT-ID and YOUR-CLIENT-CERT-ID. These are placeholders, not real certificate IDs. The validation rules expect certificate IDs made up of hexadecimal characters and hyphens. The three EBS volume IDs also look like placeholders; although their format passes the regular expression, that does not establish that the volumes exist. 
+terraform-infra.txt
+terraform-infra.txt
+
+Required action: obtain the actual certificate ARNs, and use the actual ECR ARN and EBS volume IDs from the persistent stack's outputs. Verify the configured admin_cidr against your current public IP.
+
+
+
+Blocker 2 — CoreDNS may not schedule
+All three EKS node groups have custom NO_SCHEDULE taints: workload=ci, workload=application, and workload=platform. The CoreDNS add-on does not define tolerations for these custom taints in the provided Terraform configuration. 
+terraform-infra.txt
+terraform-infra.txt
+terraform-infra.txt
+terraform-infra.txt
+
+Recommended action: make the platform node group eligible for system workloads by removing its custom taint, while retaining its workload=platform label. Then use node selectors for workloads that need to remain on particular groups. Alternatively, design a dedicated untainted system node group. Verify CoreDNS placement as part of the Kubernetes review.
+
+
+
+Blocker 3 — The AWS load-balancer integration is incomplete in these Terraform stacks
+security_group.tf defines a public load balancer security group, and networking.tf tags the public subnets for load-balancer discovery. However, the combined Terraform configuration does not define an AWS Load Balancer Controller IAM role/policy, its Pod Identity association, or an actual load balancer resource. 
+terraform-infra.txt
+terraform-infra.txt
+
+Required action: decide how the application load balancer will be provisioned. If using the AWS Load Balancer Controller, add its required IAM permissions and identity integration and ensure the controller is installed. A security group by itself does not create a load balancer.
+
+
+
+Blocker 4 — Nexus and SonarQube are not installed by their EC2 bootstrap scripts
+The Nexus and SonarQube user_data scripts install Java and utilities, locate and mount the persistent EBS volumes, and create the data directories. They do not install or start the Nexus or SonarQube services. 
+terraform-infra.txt
+terraform-infra.txt
+
+Required action: if Ansible will install and configure these services later, explicitly include that configuration step in the deployment procedure. Otherwise, complete their installation and service startup automation. Also ensure the service accounts receive ownership of their persistent data directories.
+
+
+
+2. High-priority configuration issues
+Area	Finding	Required action
+EKS workload permissions	Jenkins controller access is scoped to the ci namespace, while its agent role has ECR push permissions. This is a reasonable separation, but actual Kubernetes operations and ECR authentication must match the pipeline.  terraform-infra.txt terraform-infra.txt	Verify the intended Jenkins pipeline permissions and service-account identity.
+EKS version and add-ons	EKS is configured for version 1.37, with add-on versions left unpinned.	Confirm regional support and compatible add-on versions before provisioning. Pin versions if you want more predictable upgrades.
+Load-balancer target rules	The application security group permits port 80 from the load-balancer security group.  terraform-infra.txt	Choose the target type first. Instance targets commonly require NodePort access; IP targets use pod IPs and need compatible networking and security-group rules. Do not finalize this rule until that choice is known.
+EKS system traffic	Each launch template attaches the EKS cluster security group plus a workload-specific group.  terraform-infra.txt	Verify combined security-group behavior for node registration, pod networking, DNS, and load-balancer traffic.
+External Secrets	The IAM policy now references the dedicated application secret rather than the RDS master secret. However, the role's description still says it reads the master secret.  terraform-infra.txt	Correct the stale description. Populate the application secret only after creating the least-privilege MySQL user. Ensure the External Secrets configuration references this application secret.
+Client VPN	The VPN has two platform subnet associations and a VPC-wide authorization rule.  terraform-infra.txt	Verify the resulting route table, authorization, DNS, and connectivity to Jenkins, Nexus, SonarQube, RDS, and the private EKS API.
+EBS mounting	The Jenkins script waits up to five minutes for its volume to appear; the volume attachment is a separate Terraform resource.  terraform-infra.txt terraform-infra.txt	Test the bootstrap sequence. A more robust retry or systemd mount service would reduce the risk of boot failure if attachment is delayed.
+Database lifecycle	RDS has encryption, seven-day backups, deletion protection, and prevent_destroy. The final snapshot identifier is fixed.  terraform-infra.txt	Keep the safeguards. Review snapshot naming before intentional database recreation to avoid collisions with an existing final snapshot.
+3. Cross-stack state and resource dependencies
+Terraform state
+The S3 backend blocks in both the main and persistent stacks are commented out. The bootstrap stack defines a state bucket with versioning, encryption, public-access blocking, TLS enforcement, and prevent_destroy. 
+terraform-infra.txt
+terraform-infra.txt
+terraform-infra.txt
+
+In our earlier AWS CLI checks, the configured state bucket was not found in your account. 
+Recommended sequence:
+1. Complete the configuration review.
+2. Verify the state bucket name is available and create the bootstrap bucket using its own local state.
+3. Back up and review the local state files for the other stacks.
+4. Only then decide whether to enable the S3 backends and migrate existing state.
+Do not enable the backend blocks or migrate state during this review.
+Cross-stack outputs
+The persistent stack exposes the ECR repository details and the three EBS volume IDs. The main stack consumes those values through terraform.tfvars. 
+terraform-infra.txt
+terraform-infra.txt
+
+The output file is named ouputs.tf rather than outputs.tf. Terraform still loads it because it has the .tf extension, so this is a maintainability issue, not a functional blocker.
+The main stack also exposes the RDS endpoint, database name, port, and master-secret ARN. The application secret itself is deliberately created without a Terraform-managed secret value, which matches your decision to create the application database user manually after RDS is provisioned. 
+terraform-infra.txt
+terraform-infra.txt
+
+4. Security, reliability, and cost
+Networking
+The VPC is separated into public, EKS-private, platform, and database subnets. The private and platform subnets share one NAT Gateway; the database subnets have no default internet route. 
+terraform-infra.txt
+terraform-infra.txt
+
+This is a sensible cost-conscious lab design. The trade-off is that one NAT Gateway creates an Availability Zone dependency and ongoing cost. Retain it if the trade-off is acceptable; use two NAT Gateways if stronger AZ-level outbound resilience is required.
+
+ECR lifecycle and rollback
+The ECR repository uses immutable image tags, scan-on-push, and a lifecycle policy that expires untagged images after seven days and retains the latest 20 tagged images. 
+terraform-infra.txt
+
+Immutability is useful for traceability. However, the 20-image retention rule can expire an older image needed for rollback. Make the retention policy match the rollback window and release-tagging strategy before relying on automatic rollback.
+
+Resource sizing
+The EKS node groups use t3.small instances, and Jenkins has a t3.small controller. Nexus and SonarQube use t3.medium instances. The persistent EBS volumes are 10 GiB for Jenkins, 30 GiB for Nexus, and 30 GiB for SonarQube. 
+terraform-infra.txt
+terraform-infra.txt
+terraform-infra.txt
+terraform-infra.txt
+
+These are starting sizes, not verified capacity requirements. Maven builds, Java application pods, SonarQube analysis, Nexus artifact retention, and observability can exceed the available memory or disk. Measure usage and set monitoring and capacity thresholds before treating these as stable production sizes.
+
+Security groups and IAM
+Jenkins, Nexus, and SonarQube UIs are restricted to the Client VPN CIDR, while RDS MySQL accepts traffic from the application node security group. The custom security groups allow unrestricted outbound IPv4 traffic. 
+terraform-infra.txt
+terraform-infra.txt
+
+The inbound design is mostly sensible. Broad egress is a hardening opportunity rather than an immediate functional defect. Tighten it only after accounting for package downloads, ECR, Secrets Manager, DNS, monitoring, and required application destinations.
+
+
+5. Bootstrap and persistent stacks
+Component	Assessment
+Bootstrap S3 bucket	Good baseline protections: versioning, encryption, public-access block, TLS-only policy, and Terraform deletion protection.
+ECR repository	Immutable tags and scan-on-push are appropriate; confirm rollback retention.
+Persistent EBS volumes	Encrypted gp3 volumes with prevent_destroy; verify the actual IDs and Availability Zones before attaching them.
+Provider lockfiles	Bootstrap uses AWS provider 6.67.0; the other two stacks use 6.63.0. This is not inherently wrong because each stack has its own lockfile, but align them if you want consistent provider behavior.
+Database	Private, encrypted, backed up, and protected against accidental Terraform destruction. Keep the manual application-user creation step separate from Terraform.
+6. Final readiness checklist
+Use this as the consolidated tracker for the three Terraform directories.
+Infrastructure review tracker
+0 of 12 marked complete
+
+
+
+Required before provisioning
+[ ] Replace the VPN certificate placeholders with real, suitable ACM certificates.
+[ ] Replace the fake EBS IDs with real persistent-stack output values.
+[ ] Verify the ECR ARN and the current public IP used by admin_cidr.
+[ ] Resolve CoreDNS scheduling by making a node group eligible for system workloads.
+[ ] Choose and implement the AWS Load Balancer Controller or another explicit load-balancer provisioning mechanism.
+[ ] Decide how Nexus and SonarQube will be installed and started.
+[ ] Verify VPN connectivity, EKS add-on compatibility, and the target type/port rules.
+[ ] Review resource sizing and the RDS final snapshot naming strategy.
+State and cross-stack
+[ ] Confirm bootstrap bucket availability and review the state migration sequence.
+[ ] Verify all persistent-stack outputs are copied accurately into the main stack inputs.
+[ ] Review ECR rollback-image retention and the future deployment rollback policy.
+[ ] Correct stale IAM descriptions and the output filename typo.
+Copy checklist
+Recommendation
+Do not provision yet. Fix the four critical blockers first, then resolve the high-priority items and verify the actual AWS input values. The network separation, RDS safeguards, ECR immutability, and secret-access separation provide a solid foundation; the main gaps are now workload scheduling, load-balancer integration, service installation, and real cross-stack inputs.
+This review covers the three Terraform directories in the combined file. It does not establish that the Kubernetes manifests, Ansible configuration, or AWS-side resources are correct because those are not included in this upload. We can complete those reviews separately before moving to provisioning.
+No plan, apply, backend migration, or AWS resource creation has been performed as part of this review.
